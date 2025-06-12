@@ -1,0 +1,5 @@
+Flask
+google-cloud-firestore
+google-cloud-tasks
+google-api-core
+solapi

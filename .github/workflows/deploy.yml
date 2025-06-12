@@ -1,0 +1,45 @@
+name: Deploy to Cloud Run
+
+# Trigger on pushes to main (adjust as needed)
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1) Checkout your code
+    - uses: actions/checkout@v3
+
+    # 2) Authenticate with GCP
+    - name: Set up gcloud
+      uses: google-github-actions/setup-gcloud@v1  # sets up gcloud & ADC :contentReference[oaicite:0]{index=0}
+      with:
+        project_id: ${{ secrets.GCP_PROJECT_ID }}
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+        export_default_credentials: true
+
+    # 3) Build & push via Cloud Build (or local Docker)
+    - name: Build & push Docker image
+      run: |
+        gcloud builds submit . \
+          --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:$GITHUB_SHA
+
+    # 4) Deploy to Cloud Run
+    - name: Deploy to Cloud Run
+      uses: google-github-actions/deploy-cloudrun@v0  # official deploy action :contentReference[oaicite:1]{index=1}
+      with:
+        service: ${{ secrets.SERVICE_NAME }}
+        image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:$GITHUB_SHA
+        region: ${{ secrets.REGION }}
+        allow_unauthenticated: true
+        # Pass through your runtime env vars
+        set_env_vars: |
+          SOLAPI_API_KEY=${{ secrets.SOLAPI_API_KEY }}
+          SOLAPI_API_SECRET=${{ secrets.SOLAPI_API_SECRET }}
+          SOLAPI_SENDER=${{ secrets.SOLAPI_SENDER }}
+          QUEUE_LOCATION=${{ secrets.QUEUE_LOCATION }}
+          QUEUE_ID=${{ secrets.QUEUE_ID }}
