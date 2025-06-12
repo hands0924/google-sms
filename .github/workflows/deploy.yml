@@ -1,6 +1,5 @@
 name: Deploy to Cloud Run
 
-# Trigger on pushes to main (adjust as needed)
 on:
   push:
     branches:
@@ -14,33 +13,38 @@ jobs:
     # 1) Checkout your code
     - uses: actions/checkout@v3
 
-    # 2) Authenticate with GCP
-    - name: Set up gcloud
-      uses: google-github-actions/setup-gcloud@v1  # sets up gcloud & ADC :contentReference[oaicite:0]{index=0}
+    # 2) Authenticate to GCP using the service account key
+    - name: Authenticate to GCP
+      uses: google-github-actions/auth@v1
+      with:
+        credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+    # 3) Set up the Cloud SDK and configure ADC
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v1
       with:
         project_id: ${{ secrets.GCP_PROJECT_ID }}
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
         export_default_credentials: true
 
-    # 3) Configure Docker
+    # 4) Configure Docker authentication for Container Registry
     - name: Configure Docker
-      run: gcloud auth configure-docker
+      run: |
+        gcloud auth configure-docker
 
-    # 4) Build & push via Cloud Build (or local Docker)
-    - name: Build & push Docker image
+    # 5) Build & push the Docker image to Container Registry
+    - name: Build & Push Docker image
       run: |
         gcloud builds submit . \
-          --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:$GITHUB_SHA
+          --tag gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:${{ github.sha }}
 
-    # 5) Deploy to Cloud Run
+    # 6) Deploy the pushed image to Cloud Run
     - name: Deploy to Cloud Run
-      uses: google-github-actions/deploy-cloudrun@v0  # official deploy action :contentReference[oaicite:1]{index=1}
+      uses: google-github-actions/deploy-cloudrun@v0
       with:
         service: ${{ secrets.SERVICE_NAME }}
-        image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:$GITHUB_SHA
+        image: gcr.io/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.SERVICE_NAME }}:${{ github.sha }}
         region: ${{ secrets.REGION }}
         allow_unauthenticated: true
-        # Pass through your runtime env vars
         set_env_vars: |
           SOLAPI_API_KEY=${{ secrets.SOLAPI_API_KEY }}
           SOLAPI_API_SECRET=${{ secrets.SOLAPI_API_SECRET }}
